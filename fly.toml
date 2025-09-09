@@ -1,0 +1,36 @@
+app = "pasada-analytics"
+primary_region = "sin"
+
+# Using Dockerfile instead of Heroku builder
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  SERVICE_TYPE = "analytics"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = [ "app" ]
+
+[[services.ports]]
+  port = 80
+  handlers = ["http"]
+  force_https = true
+
+[[services.ports]]
+  port = 443
+  handlers = ["tls", "http"]
+
+[services.concurrency]
+  type = "requests"
+  hard_limit = 10
+  soft_limit = 5
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "1gb"
