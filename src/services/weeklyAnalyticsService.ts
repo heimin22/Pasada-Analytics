@@ -51,13 +51,13 @@ export class WeeklyAnalyticsService {
   async generateTrafficPredictions(routeId: number): Promise<TrafficPrediction[]> {
     const query = `
       SELECT 
-        hour,
+        extract(hour from timestamp) as hour,
         avg(traffic_density) as avg_density,
         count(*) as data_points
       FROM traffic_analytics 
-      WHERE route_id = $1 
-        AND timestamp > now() - INTERVAL '4 weeks'
-      SAMPLE BY 1h
+      WHERE route_id = ${routeId} 
+        AND timestamp > dateadd('w', -4, now())
+      GROUP BY hour
       ORDER BY hour
     `;
 
@@ -136,8 +136,8 @@ export class WeeklyAnalyticsService {
         avg(avg_speed_kmh) as avg_speed,
         sum(sample_count) as total_samples
       FROM route_weekly_summary 
-      WHERE route_id = $1 
-        AND ts > now() - INTERVAL '${days} days'
+      WHERE route_id = '${routeId}' 
+        AND ts > dateadd('d', -${days}, now())
     `;
 
     try {

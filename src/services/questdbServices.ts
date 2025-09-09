@@ -210,6 +210,9 @@ export class QuestDBService {
         // required fields
         fields.push(`sample_count=${this.sanitizeInteger(data.sample_count)}i`);
         
+        // Add week_start as a field (not a tag since it's DATE type)
+        fields.push(`week_start="${data.week_start}"`);
+        
         // Optional fields with null checks and validation
         if (this.isValidNumber(data.avg_traffic_density)) {
             fields.push(`avg_traffic_density=${this.sanitizeFloat(data.avg_traffic_density, 4)}`);
@@ -279,7 +282,8 @@ export class QuestDBService {
               `duration=${this.sanitizeInteger(data.duration)}i`,
               `duration_in_traffic=${this.sanitizeInteger(data.durationInTraffic)}i`,
               `distance=${this.sanitizeInteger(data.distance)}i`,
-              `status="${data.status}"`
+              `status="${data.status}"`,
+              `created_at=${tsNanos}i`
             ];
     
             return `traffic_analytics,${tags} ${fields.join(',')} ${tsNanos}`;
