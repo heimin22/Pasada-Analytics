@@ -1,38 +1,14 @@
 #!/usr/bin/env ts-node
 import { WeeklyAnalyticsService } from '../services/weeklyAnalyticsService';
-import { QuestDBConfig } from '../services/questdbServices';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
-
-// Validate environment variables
-function validateEnvironment(): QuestDBConfig {
-  const config: QuestDBConfig = {
-    pgConnectionString: process.env.PG_CONN || process.env.DATABASE_URL || '',
-    ilpEndpoint: process.env.QUESTDB_ILP || '',
-    httpEndpoint: process.env.QUESTDB_HTTP || '',
-    connectionTimeout: 30000,
-  };
-
-  if (!config.pgConnectionString) {
-    throw new Error('Missing PG_CONN or DATABASE_URL environment variable');
-  }
-  if (!config.ilpEndpoint) {
-    throw new Error('Missing QUESTDB_ILP environment variable');
-  }
-  if (!config.httpEndpoint) {
-    throw new Error('Missing QUESTDB_HTTP environment variable');
-  }
-
-  return config;
-}
+import { env } from '../config/environment';
+import logger, { analyticsLogger } from '../utils/logger';
 
 async function main() {
   try {
     console.log('Starting weekly analytics processing...');
+    logger.info('Weekly analytics processing initiated');
     
-    const config = validateEnvironment();
-    const analyticsService = new WeeklyAnalyticsService(config);
+    const analyticsService = new WeeklyAnalyticsService(env.questdb);
 
     // Process last week's data
     const result = await analyticsService.processWeeklyAnalytics(1);
@@ -40,8 +16,13 @@ async function main() {
     if (result.success) {
       console.log(`${result.message}`);
       console.log(`Processed ${result.rowsProcessed} records`);
+      analyticsLogger.weeklyAnalytics(1, result.rowsProcessed, 0);
+      logger.info('Weekly analytics processing completed successfully', { 
+        rowsProcessed: result.rowsProcessed 
+      });
     } else {
       console.error(`${result.message}`);
+      logger.error('Weekly analytics processing failed', new Error(result.message));
       process.exit(1);
     }
 
@@ -51,11 +32,17 @@ async function main() {
       for (let week = 2; week <= 4; week++) {
         const backfillResult = await analyticsService.processWeeklyAnalytics(week);
         console.log(`Week -${week}: ${backfillResult.message}`);
+        analyticsLogger.weeklyAnalytics(week, backfillResult.rowsProcessed, 0);
+        logger.info('Backfill processing completed', { 
+          week, 
+          rowsProcessed: backfillResult.rowsProcessed 
+        });
       }
     }
 
   } catch (error) {
     console.error('Weekly analytics processing failed:', error);
+    logger.error('Weekly analytics processing failed', error as Error);
     process.exit(1);
   }
 }
