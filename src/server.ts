@@ -19,9 +19,20 @@ class AnalyticsServer {
 
   constructor() {
     this.app = express();
-    this.questdbService = new QuestDBService(env.questdb);
-    this.weeklyAnalyticsService = new WeeklyAnalyticsService(env.questdb);
-    this.analyticsService = new AnalyticsService(null); // No database service for now
+    
+    // Initialize services with graceful error handling
+    try {
+      this.questdbService = new QuestDBService(env.questdb);
+      this.weeklyAnalyticsService = new WeeklyAnalyticsService(env.questdb);
+      this.analyticsService = new AnalyticsService(null); // No database service for now
+      logger.info('All services initialized successfully');
+    } catch (error) {
+      logger.warn('Some services failed to initialize:', error);
+      // Initialize with null services for graceful degradation
+      this.questdbService = new QuestDBService(env.questdb);
+      this.weeklyAnalyticsService = new WeeklyAnalyticsService(env.questdb);
+      this.analyticsService = new AnalyticsService(null);
+    }
     
     this.setupMiddleware();
     this.setupRoutes();
@@ -97,8 +108,23 @@ class AnalyticsServer {
     });
 
     // QuestDB status
-    this.app.get('/api/status/questdb', async (_req, res) => {
+    this.app.get('/api/status/questdb', async (_req, res): Promise<void> => {
       try {
+        // Check if QuestDB is configured
+        if (!env.questdb.httpEndpoint || !env.questdb.pgConnectionString) {
+          res.status(503).json({ 
+            status: 'not_configured', 
+            message: 'QuestDB endpoints not configured',
+            config: {
+              httpEndpoint: !!env.questdb.httpEndpoint,
+              pgConnection: !!env.questdb.pgConnectionString,
+              ilpEndpoint: !!env.questdb.ilpEndpoint
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
         await this.questdbService.connect();
         const testQuery = 'SELECT 1 as test';
         await this.questdbService.queryAnalytics(testQuery);
@@ -110,6 +136,7 @@ class AnalyticsServer {
         res.status(503).json({ 
           status: 'error', 
           message: 'QuestDB connection failed',
+          error: env.nodeEnv === 'development' ? (error as Error).message : 'Connection error',
           timestamp: new Date().toISOString()
         });
       }
@@ -412,7 +439,7 @@ class AnalyticsServer {
       });
 
       res.status(500).json({
-        error: env.nodeEnv === 'production' ? 'Internal server error' : error.message,
+        error: env.nodeEnv === 'production' ? 'Internal server error' : (error as Error).message,
         timestamp: new Date().toISOString()
       });
     });
@@ -422,16 +449,16 @@ class AnalyticsServer {
     const port = env.port;
     
     this.app.listen(port, () => {
-      logger.info(`🚀 Pasada Analytics Server running on port ${port}`);
-      logger.info(`📊 Environment: ${env.nodeEnv}`);
-      logger.info(`🔗 QuestDB: ${env.questdb.httpEndpoint}`);
+      logger.info(`Pasada Analytics Server running on port ${port}`);
+      logger.info(`Environment: ${env.nodeEnv}`);
+      logger.info(`QuestDB: ${env.questdb.httpEndpoint}`);
       
       console.log(`
-🎯 Pasada Analytics Server Started!
-🌐 Port: ${port}
-📊 Environment: ${env.nodeEnv}
-🔗 Health Check: http://localhost:${port}/health
-📈 API Base: http://localhost:${port}/api
+Pasada Analytics Server Started!
+Port: ${port}
+Environment: ${env.nodeEnv}
+Health Check: http://localhost:${port}/health
+API Base: http://localhost:${port}/api
       `);
     });
 
@@ -441,11 +468,11 @@ class AnalyticsServer {
   }
 
   private async shutdown(): Promise<void> {
-    logger.info('🛑 Shutting down server gracefully...');
+    logger.info('Shutting down server gracefully...');
     
     try {
       await this.questdbService.disconnect();
-      logger.info('✅ Database connections closed');
+      logger.info('Database connections closed');
     } catch (error) {
       logger.error('Error closing database connections', error);
     }

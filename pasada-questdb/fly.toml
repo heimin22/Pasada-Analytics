@@ -1,0 +1,25 @@
+app = "pasada-questdb-1757688431"
+yprimary_region = "sin"
+
+[mounts]
+  source = "questdb_data"
+  destination = "/var/lib/questdb"
+
+[[services]]
+  internal_port = 9000
+  protocol = "tcp"
+  
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+  
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+[[services]]
+  internal_port = 9009
+  protocol = "tcp"
+  
+  [[services.ports]]
+    port = 9009

@@ -44,6 +44,10 @@ export class EnvironmentValidator {
     return value;
   }
 
+  private static getEnvVarOptional(name: string): string | undefined {
+    return process.env[name];
+  }
+
   private static getEnvNumber(name: string, defaultValue?: number): number {
     const value = process.env[name];
     if (!value) {
@@ -58,27 +62,32 @@ export class EnvironmentValidator {
   }
 
   static validate(): EnvironmentConfig {
+    const missingVars: string[] = [];
+    const warnings: string[] = [];
+
     try {
+      const nodeEnv = process.env.NODE_ENV;
+      
       const config: EnvironmentConfig = {
-        // Server Configuration
+        // Server Configuration - always required
         port: this.getEnvNumber('PORT', 3001),
         nodeEnv: this.getEnvVar('NODE_ENV', 'development'),
-        apiUrl: this.getEnvVar('API_URL'),
+        apiUrl: this.getEnvVarOptional('API_URL') || `http://localhost:${this.getEnvNumber('PORT', 3001)}`,
 
-        // Google Maps
-        googleMapsApiKey: this.getEnvVar('GOOGLE_MAPS_API_KEY'),
+        // Google Maps - optional in development
+        googleMapsApiKey: this.getEnvVarOptional('GOOGLE_MAPS_API_KEY') || '',
 
-        // Supabase
-        supabaseUrl: this.getEnvVar('SUPABASE_URL'),
-        supabaseServiceRoleKey: this.getEnvVar('SUPABASE_SERVICE_ROLE_KEY'),
-        supabaseAnonKey: this.getEnvVar('SUPABASE_ANON_KEY'),
-        postgresConnection: this.getEnvVar('POSTGRES_CONNECTION'),
+        // Supabase - required in production, optional in development
+        supabaseUrl: this.getEnvVarOptional('SUPABASE_URL') || '',
+        supabaseServiceRoleKey: this.getEnvVarOptional('SUPABASE_SERVICE_ROLE_KEY') || '',
+        supabaseAnonKey: this.getEnvVarOptional('SUPABASE_ANON_KEY') || '',
+        postgresConnection: this.getEnvVarOptional('POSTGRES_CONNECTION') || '',
 
-        // QuestDB Configuration
+        // QuestDB Configuration - check if at least basic endpoints are available
         questdb: {
-          pgConnectionString: this.getEnvVar('PG_CONN', process.env.DATABASE_URL || ''),
-          ilpEndpoint: this.getEnvVar('QUESTDB_ILP'),
-          httpEndpoint: this.getEnvVar('QUESTDB_HTTP'),
+          pgConnectionString: this.getEnvVarOptional('PG_CONN') || process.env.SUPABASE_URL || '',
+          ilpEndpoint: this.getEnvVarOptional('QUESTDB_ILP') || '',
+          httpEndpoint: this.getEnvVarOptional('QUESTDB_HTTP') || '',
           connectionTimeout: this.getEnvNumber('QUESTDB_TIMEOUT', 30000),
         },
 
@@ -96,15 +105,56 @@ export class EnvironmentValidator {
         },
       };
 
-      // Validate QuestDB configuration
-      if (!config.questdb.pgConnectionString) {
-        throw new Error('Missing PostgreSQL connection string (PG_CONN or DATABASE_URL)');
+      // Validation based on environment
+      if (nodeEnv === 'production') {
+        // In production, require essential services
+        if (!config.questdb.pgConnectionString) {
+          missingVars.push('PG_CONN or SUPABASE_URL');
+        }
+        if (!config.questdb.ilpEndpoint) {
+          missingVars.push('QUESTDB_ILP');
+        }
+        if (!config.questdb.httpEndpoint) {
+          missingVars.push('QUESTDB_HTTP');
+        }
+        if (!config.supabaseUrl) {
+          warnings.push('SUPABASE_URL not set - some features may not work');
+        }
+      } else {
+        // In development, just warn about missing services
+        if (!config.questdb.pgConnectionString) {
+          warnings.push('Database connection not configured (PG_CONN/SUPABASE_URL)');
+        }
+        if (!config.questdb.ilpEndpoint) {
+          warnings.push('QuestDB ILP endpoint not configured (QUESTDB_ILP)');
+        }
+        if (!config.questdb.httpEndpoint) {
+          warnings.push('QuestDB HTTP endpoint not configured (QUESTDB_HTTP)');
+        }
       }
 
-      console.log('Environment configuration validated successfully');
+      // Show warnings
+      if (warnings.length > 0) {
+        console.warn('Environment warnings:');
+        warnings.forEach(warning => console.warn(`${warning}`));
+      }
+
+      // Fail only if critical variables are missing
+      if (missingVars.length > 0) {
+        const errorMsg = `Missing required environment variables: ${missingVars.join(', ')}`;
+        console.error(`${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      console.log(`Environment configuration validated successfully (${nodeEnv} mode)`);
+      if (warnings.length === 0) {
+        console.log('All services properly configured');
+      }
+      
       return config;
     } catch (error) {
       console.error('Environment validation failed:', error);
+      console.error('Check ENVIRONMENT.md for setup instructions');
       throw error;
     }
   }
