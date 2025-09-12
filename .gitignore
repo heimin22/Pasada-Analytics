@@ -46,3 +46,7 @@ Desktop.ini
 .env.production
 
 pasada-9d699-firebase-adminsdk-fbsvc-020f3971da.json
+migrate-local.js
+migrate-local-http.js
+simple-migrate.js
+create-tables.sql
