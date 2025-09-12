@@ -50,3 +50,5 @@ migrate-local.js
 migrate-local-http.js
 simple-migrate.js
 create-tables.sql
+typescript_migration_script.txt
+supabase-to-flyio-migration.js
