@@ -1,5 +1,8 @@
 app = "pasada-questdb-1757688431"
-yprimary_region = "sin"
+primary_region = "sin"
+
+[experimental]
+  init_limit_ulimit_nofile = 1048576
 
 [mounts]
   source = "questdb_data"

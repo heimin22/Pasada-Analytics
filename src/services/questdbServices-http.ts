@@ -97,14 +97,14 @@ export class QuestDBServiceHTTP {
     private async executeQuery(query: string): Promise<any> {
         try {
             const url = new URL(this.config.httpEndpoint + '/exec');
+            url.searchParams.set('query', query);
             
             const response = await fetch(url.toString(), {
-                method: 'POST',
+                method: 'GET',
                 headers: { 
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
                     'User-Agent': 'Pasada-Analytics/1.0'
-                },
-                body: `query=${encodeURIComponent(query)}`
+                }
             });
 
             if (!response.ok) {
