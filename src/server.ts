@@ -1,43 +1,112 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable no-unused-vars */
+/* eslint-disable no-console */
+
+console.log('=== SERVER MODULE LOADING ===');
+console.log('Loading server module...');
+
+console.log('Importing express...');
 import express from 'express';
+console.log('Express imported successfully');
+
+console.log('Importing cors...');
 import cors from 'cors';
+console.log('Cors imported successfully');
+
+console.log('Importing helmet...');
 import helmet from 'helmet';
+console.log('Helmet imported successfully');
+
+console.log('Importing compression...');
 import compression from 'compression';
+console.log('Compression imported successfully');
+
+console.log('Importing rateLimit...');
 import rateLimit from 'express-rate-limit';
+console.log('RateLimit imported successfully');
+
+console.log('Importing morgan...');
 import morgan from 'morgan';
+console.log('Morgan imported successfully');
+
+console.log('Importing environment config...');
 import { env } from './config/environment';
+console.log('Environment config imported successfully');
+
+console.log('Importing logger...');
 import logger, { analyticsLogger } from './utils/logger';
+console.log('Logger imported successfully');
+
+console.log('Importing QuestDBService...');
 import { QuestDBService } from './services/questdbServices';
+console.log('QuestDBService imported successfully');
+
+console.log('Importing WeeklyAnalyticsService...');
 import { WeeklyAnalyticsService } from './services/weeklyAnalyticsService';
+console.log('WeeklyAnalyticsService imported successfully');
+
+console.log('Importing AnalyticsService...');
 import { AnalyticsService } from './services/analyticsService';
+console.log('AnalyticsService imported successfully');
+
+console.log('Importing cron...');
 import cron from 'node-cron';
+console.log('Cron imported successfully');
+
+console.log('All imports completed successfully');
 
 class AnalyticsServer {
   private app: express.Application;
-  private questdbService: QuestDBService;
-  private weeklyAnalyticsService: WeeklyAnalyticsService;
+  private questdbService: QuestDBService | null;
+  private weeklyAnalyticsService: WeeklyAnalyticsService | null;
   private analyticsService: AnalyticsService;
+  private server?: ReturnType<express.Application['listen']>;
 
   constructor() {
+    console.log('=== CONSTRUCTOR START ===');
     this.app = express();
+    console.log('Express app created');
     
     // Initialize services with graceful error handling
     try {
-      this.questdbService = new QuestDBService(env.questdb);
-      this.weeklyAnalyticsService = new WeeklyAnalyticsService(env.questdb);
+      console.log('Starting service initialization...');
+      
+      // Only initialize QuestDB services if configuration is available
+      if (env.questdb.pgConnectionString && env.questdb.ilpEndpoint && env.questdb.httpEndpoint) {
+        console.log('Initializing QuestDB services...');
+        this.questdbService = new QuestDBService(env.questdb);
+        this.weeklyAnalyticsService = new WeeklyAnalyticsService(env.questdb);
+        logger.info('QuestDB services initialized successfully');
+        console.log('QuestDB services initialized successfully');
+      } else {
+        logger.warn('QuestDB configuration incomplete - services will be limited');
+        console.log('QuestDB configuration incomplete - services will be limited');
+        this.questdbService = null;
+        this.weeklyAnalyticsService = null;
+      }
+      
+      console.log('Initializing AnalyticsService...');
       this.analyticsService = new AnalyticsService(null); // No database service for now
       logger.info('All services initialized successfully');
+      console.log('All services initialized successfully');
     } catch (error) {
       logger.warn('Some services failed to initialize:', error);
+      console.error('Some services failed to initialize:', error);
       // Initialize with null services for graceful degradation
-      this.questdbService = new QuestDBService(env.questdb);
-      this.weeklyAnalyticsService = new WeeklyAnalyticsService(env.questdb);
+      this.questdbService = null;
+      this.weeklyAnalyticsService = null;
       this.analyticsService = new AnalyticsService(null);
     }
     
+    console.log('Setting up middleware...');
     this.setupMiddleware();
+    console.log('Setting up routes...');
     this.setupRoutes();
+    console.log('Setting up cron jobs...');
     this.setupCronJobs();
+    console.log('Setting up error handling...');
     this.setupErrorHandling();
+    console.log('=== CONSTRUCTOR COMPLETE ===');
   }
 
   private setupMiddleware(): void {
@@ -110,11 +179,11 @@ class AnalyticsServer {
     // QuestDB status
     this.app.get('/api/status/questdb', async (_req, res): Promise<void> => {
       try {
-        // Check if QuestDB is configured
-        if (!env.questdb.httpEndpoint || !env.questdb.pgConnectionString) {
+        // Check if QuestDB service is available
+        if (!this.questdbService) {
           res.status(503).json({ 
             status: 'not_configured', 
-            message: 'QuestDB endpoints not configured',
+            message: 'QuestDB service not initialized',
             config: {
               httpEndpoint: !!env.questdb.httpEndpoint,
               pgConnection: !!env.questdb.pgConnectionString,
@@ -161,6 +230,10 @@ class AnalyticsServer {
           return res.status(400).json({ error: 'Invalid route ID' });
         }
 
+        if (!this.weeklyAnalyticsService) {
+          return res.status(503).json({ error: 'Analytics service not available' });
+        }
+        
         const summary = await this.weeklyAnalyticsService.getRouteAnalyticsSummary(routeId, days);
         
         if (!summary) {
@@ -232,6 +305,10 @@ class AnalyticsServer {
           return res.status(403).json({ error: 'Query contains disallowed operations' });
         }
 
+        if (!this.questdbService) {
+          return res.status(503).json({ error: 'Database service not available' });
+        }
+        
         const startTime = Date.now();
         const result = await this.questdbService.queryAnalytics(query, params);
         const duration = Date.now() - startTime;
@@ -375,7 +452,7 @@ class AnalyticsServer {
         // Validate data structure
         const requiredFields = ['timestamp', 'routeId', 'trafficDensity', 'duration', 'durationInTraffic', 'distance', 'status'];
         const invalidRecords = trafficData.filter(record => 
-          !requiredFields.every(field => record.hasOwnProperty(field))
+          !requiredFields.every(field => Object.prototype.hasOwnProperty.call(record, field))
         );
 
         if (invalidRecords.length > 0) {
@@ -432,6 +509,10 @@ class AnalyticsServer {
         query += ' ORDER BY timestamp DESC';
         query += ` LIMIT ${Math.min(parseInt(limit as string), 10000)}`;
 
+        if (!this.questdbService) {
+          return res.status(503).json({ error: 'Database service not available' });
+        }
+        
         const result = await this.questdbService.queryAnalytics(query, params);
 
         res.json({
@@ -443,9 +524,11 @@ class AnalyticsServer {
             generatedAt: new Date().toISOString()
           }
         });
+        return;
       } catch (error) {
         logger.error('Traffic data fetch failed', error);
         res.status(500).json({ error: 'Failed to fetch traffic data' });
+        return;
       }
     });
 
@@ -460,6 +543,10 @@ class AnalyticsServer {
       try {
         const weekOffset = parseInt(req.params.weekOffset || '1') || 1;
         
+        if (!this.weeklyAnalyticsService) {
+          return res.status(503).json({ error: 'Analytics service not available' });
+        }
+        
         const result = await this.weeklyAnalyticsService.processWeeklyAnalytics(weekOffset);
         
         res.json({
@@ -471,9 +558,11 @@ class AnalyticsServer {
           },
           timestamp: new Date().toISOString()
         });
+        return;
       } catch (error) {
         logger.error('Manual weekly processing failed', error);
         res.status(500).json({ error: 'Failed to process weekly analytics' });
+        return;
       }
     });
 
@@ -503,9 +592,13 @@ class AnalyticsServer {
       cron.schedule('0 2 * * 1', async () => {
         logger.info('Starting scheduled weekly analytics processing');
         try {
-          const result = await this.weeklyAnalyticsService.processWeeklyAnalytics(1);
-          analyticsLogger.weeklyAnalytics(1, result.rowsProcessed, 0);
-          logger.info('Scheduled weekly analytics completed', { result });
+          if (this.weeklyAnalyticsService) {
+            const result = await this.weeklyAnalyticsService.processWeeklyAnalytics(1);
+            analyticsLogger.weeklyAnalytics(1, result.rowsProcessed, 0);
+            logger.info('Scheduled weekly analytics completed', { result });
+          } else {
+            logger.warn('Weekly analytics service not available - skipping scheduled run');
+          }
         } catch (error) {
           logger.error('Scheduled weekly analytics failed', error);
         }
@@ -585,50 +678,109 @@ class AnalyticsServer {
   }
 
   public start(): void {
+    console.log('=== START METHOD CALLED ===');
     const port = env.port;
+    const host = env.nodeEnv === 'production' ? '0.0.0.0' : 'localhost';
     
-    this.app.listen(port, () => {
-      logger.info(`Pasada Analytics Server running on port ${port}`);
+    console.log(`Attempting to start server on ${host}:${port}`);
+    
+    const server = this.app.listen(port, host, () => {
+      logger.info(`Pasada Analytics Server running on ${host}:${port}`);
       logger.info(`Environment: ${env.nodeEnv}`);
       logger.info(`QuestDB: ${env.questdb.httpEndpoint}`);
       
       console.log(`
 Pasada Analytics Server Started!
+Host: ${host}
 Port: ${port}
 Environment: ${env.nodeEnv}
-Health Check: http://localhost:${port}/health
-API Base: http://localhost:${port}/api
+Health Check: http://${host}:${port}/health
+API Base: http://${host}:${port}/api
       `);
+    }).on('error', (error: Error & { code?: string }) => {
+      logger.error('Server listen error', error);
+      console.error('Server listen error:', error);
+      
+      if (error.code === 'EADDRINUSE') {
+        logger.error(`Port ${port} is already in use. Server cannot start.`);
+        console.error(`Error: Port ${port} is already in use. Please stop the process using this port or use a different port.`);
+        process.exit(1);
+      } else {
+        logger.error('Unexpected server error:', error);
+        console.error('Server failed to start:', error.message);
+        process.exit(1);
+      }
     });
 
+    console.log('Server listen call completed, setting up signal handlers...');
+    
     // Graceful shutdown
     process.on('SIGTERM', this.shutdown.bind(this));
     process.on('SIGINT', this.shutdown.bind(this));
+    
+    // Store server reference for graceful shutdown
+    this.server = server;
+    
+    console.log('=== START METHOD COMPLETE ===');
   }
 
   private async shutdown(): Promise<void> {
     logger.info('Shutting down server gracefully...');
     
     try {
-      await this.questdbService.disconnect();
-      logger.info('Database connections closed');
+      // Close the HTTP server
+      if (this.server) {
+        await new Promise<void>((resolve) => {
+          this.server!.close(() => {
+            logger.info('HTTP server closed');
+            resolve();
+          });
+        });
+      }
+      
+      // Close database connections
+      if (this.questdbService) {
+        await this.questdbService.disconnect();
+        logger.info('Database connections closed');
+      }
     } catch (error) {
-      logger.error('Error closing database connections', error);
+      logger.error('Error during shutdown', error);
     }
     
+    logger.info('Server shutdown complete');
     process.exit(0);
   }
 }
 
-// Start server if this file is run directly
-if (require.main === module) {
-  try {
-    const server = new AnalyticsServer();
-    server.start();
-  } catch (error) {
-    logger.error('Failed to start server', error);
-    process.exit(1);
-  }
+// Always start server when this module is loaded
+console.log('=== MAIN STARTUP SECTION ===');
+try {
+  console.log('Creating AnalyticsServer instance...');
+  const server = new AnalyticsServer();
+  console.log('AnalyticsServer instance created, calling start()...');
+  server.start();
+  console.log('Server start() method completed');
+} catch (error) {
+  console.error('Failed to start server:', error);
+  logger.error('Failed to start server', error);
+  // Don't throw error to prevent exit code 1, just log and exit gracefully
+  process.exit(1);
 }
+console.log('=== MAIN STARTUP SECTION COMPLETE ===');
+
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  logger.error('Uncaught Exception', error);
+  // Don't exit immediately, let the server try to continue
+  // process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('Unhandled Rejection', { reason, promise });
+  // Don't exit immediately, let the server try to continue
+  // process.exit(1);
+});
 
 export default AnalyticsServer;

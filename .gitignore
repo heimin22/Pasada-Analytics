@@ -54,3 +54,4 @@ simple-migrate.js
 create-tables.sql
 typescript_migration_script.txt
 supabase-to-flyio-migration.js
+test-minimal-server.js

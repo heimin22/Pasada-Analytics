@@ -1,5 +1,7 @@
+/* eslint-disable no-console */
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
+import { QuestDBQueryResponse, WeeklySummaryData } from '../types/traffic';
 
 dotenv.config();
 
@@ -39,7 +41,7 @@ export class QuestDBServiceHTTP {
         this.validateConfig();
     }
 
-    private validateConfig() {
+    private validateConfig(): void {
         if (!this.config.httpEndpoint) {
             throw new Error('QuestDB HTTP endpoint is required');
         }
@@ -94,7 +96,7 @@ export class QuestDBServiceHTTP {
     }
 
     // Execute SQL query via HTTP
-    private async executeQuery(query: string): Promise<any> {
+    private async executeQuery(query: string): Promise<QuestDBQueryResponse> {
         try {
             const url = new URL(this.config.httpEndpoint + '/exec');
             url.searchParams.set('query', query);
@@ -112,7 +114,7 @@ export class QuestDBServiceHTTP {
                 throw new Error(`QuestDB query failed: ${response.status} - ${errorText}`);
             }
 
-            const result = await response.json();
+            const result = await response.json() as QuestDBQueryResponse;
             return result;
         } catch (error) {
             throw new Error(`Query execution failed: ${error}`);
@@ -159,7 +161,7 @@ export class QuestDBServiceHTTP {
     }
 
     // Insert weekly summary data
-    async pushToQuestDB(data: any[]): Promise<void> {
+    async pushToQuestDB(data: WeeklySummaryData[]): Promise<void> {
         if (!data || data.length === 0) {
             console.log('No weekly summary data to push to QuestDB');
             return;

@@ -1,4 +1,5 @@
 #!/usr/bin/env ts-node
+/* eslint-disable no-console */
 
 /**
  * Traffic Analytics Integration Test
@@ -18,7 +19,7 @@ import logger from '../utils/logger';
 interface TestResult {
   passed: boolean;
   message: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 class TrafficAnalyticsIntegrationTest {
@@ -56,7 +57,7 @@ class TrafficAnalyticsIntegrationTest {
     ];
 
     let allPassed = true;
-    const details: any = {};
+    const details: Record<string, string> = {};
 
     for (const envVar of requiredEnvVars) {
       const exists = !!envVar.value;
@@ -169,8 +170,8 @@ class TrafficAnalyticsIntegrationTest {
       'GET /api/analytics/traffic/status'
     ];
 
-    let allPassed = true;
-    const details: any = {};
+    const allPassed = true;
+    const details: Record<string, string> = {};
 
     for (const endpoint of apiTests) {
       // Mock test - in real scenario, you'd make HTTP requests

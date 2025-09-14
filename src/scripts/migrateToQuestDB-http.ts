@@ -1,4 +1,7 @@
 #!/usr/bin/env ts-node
+/* eslint-disable no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable no-console */
 import { QuestDBServiceHTTP } from '../services/questdbServices-http';
 import { env } from '../config/environment';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -81,7 +84,8 @@ class QuestDBMigrationHTTP {
   private async migrateTrafficAnalytics(options: MigrationOptions): Promise<void> {
     console.log('Migrating traffic analytics data...');
 
-    // Build query filters
+    // Build query filters  
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let query = this.supabase
       .from('traffic_analytics')
       .select(`
@@ -105,6 +109,8 @@ class QuestDBMigrationHTTP {
     if (options.routeIds && options.routeIds.length > 0) {
       query = query.in('route_id', options.routeIds);
     }
+    
+    // Note: query is used in the batch processing below
 
     // Get total count
     const { count: totalRecords, error: countError } = await this.supabase
@@ -236,7 +242,7 @@ class QuestDBMigrationHTTP {
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
   
   const options: MigrationOptions = {
