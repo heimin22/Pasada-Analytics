@@ -23,7 +23,9 @@ dist/
 .env.*.local
 *.env
 .cache/
-*.log                  
+*.logs
+logs/
+logs                  
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -52,3 +54,4 @@ simple-migrate.js
 create-tables.sql
 typescript_migration_script.txt
 supabase-to-flyio-migration.js
+test-minimal-server.js

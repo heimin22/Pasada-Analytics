@@ -3,6 +3,7 @@ import { QuestDBService } from '../services/questdbServices';
 import { env } from '../config/environment';
 import { Client } from 'pg';
 import logger, { analyticsLogger } from '../utils/logger';
+import { WeeklySummaryData } from '../types/traffic';
 
 interface MigrationOptions {
   dryRun: boolean;
@@ -184,6 +185,7 @@ class QuestDBMigration {
     console.log(`Traffic analytics migration completed: ${totalMigrated} records`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars  
   private async generateWeeklySummaries(_options: MigrationOptions): Promise<void> {
     console.log('Generating weekly summaries...');
 
@@ -239,7 +241,7 @@ class QuestDBMigration {
     console.log(`Weekly summaries completed: ${summariesGenerated} summaries generated`);
   }
 
-  private async calculateWeeklySummariesFromSupabase(weekOffset: number): Promise<any[]> {
+  private async calculateWeeklySummariesFromSupabase(weekOffset: number): Promise<WeeklySummaryData[]> {
     // This method calculates weekly summaries directly from Supabase data
     // Similar to the query in QuestDBService.getWeeklyAnalytics
     const query = `

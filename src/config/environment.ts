@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import dotenv from 'dotenv';
 import { QuestDBConfig } from '../services/questdbServices';
 
@@ -107,19 +108,25 @@ export class EnvironmentValidator {
 
       // Validation based on environment
       if (nodeEnv === 'production') {
-        // In production, require essential services
+        // In production, make services optional but warn about missing ones
         if (!config.questdb.pgConnectionString) {
-          missingVars.push('PG_CONN or SUPABASE_URL');
+          warnings.push('PG_CONN or SUPABASE_URL not set - database features will be limited');
         }
         if (!config.questdb.ilpEndpoint) {
-          missingVars.push('QUESTDB_ILP');
+          warnings.push('QUESTDB_ILP not set - data ingestion will be limited');
         }
         if (!config.questdb.httpEndpoint) {
-          missingVars.push('QUESTDB_HTTP');
+          warnings.push('QUESTDB_HTTP not set - analytics queries will be limited');
         }
         if (!config.supabaseUrl) {
           warnings.push('SUPABASE_URL not set - some features may not work');
         }
+        if (!config.googleMapsApiKey) {
+          warnings.push('GOOGLE_MAPS_API_KEY not set - traffic analytics will be limited');
+        }
+        
+        // In production, don't fail if services are missing - just warn
+        console.log('Production mode: Server will start with available services only');
       } else {
         // In development, just warn about missing services
         if (!config.questdb.pgConnectionString) {
@@ -174,5 +181,40 @@ export class EnvironmentValidator {
   }
 }
 
-// Export singleton instance
-export const env = EnvironmentValidator.validate();
+// Export singleton instance with error handling
+let env: EnvironmentConfig;
+try {
+  env = EnvironmentValidator.validate();
+} catch (error) {
+  console.error('Environment validation failed:', error);
+  console.log('Falling back to minimal configuration...');
+  // Fallback to minimal configuration
+  env = {
+    port: parseInt(process.env.PORT || '3001'),
+    nodeEnv: process.env.NODE_ENV || 'production',
+    apiUrl: process.env.API_URL || 'http://localhost:3001',
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+    supabaseUrl: process.env.SUPABASE_URL || '',
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
+    postgresConnection: process.env.POSTGRES_CONNECTION || '',
+    questdb: {
+      pgConnectionString: process.env.PG_CONN || process.env.SUPABASE_URL || '',
+      ilpEndpoint: process.env.QUESTDB_ILP || '',
+      httpEndpoint: process.env.QUESTDB_HTTP || '',
+      connectionTimeout: parseInt(process.env.QUESTDB_TIMEOUT || '30000'),
+    },
+    analytics: {
+      batchSize: parseInt(process.env.ANALYTICS_BATCH_SIZE || '100'),
+      timeout: parseInt(process.env.ANALYTICS_TIMEOUT || '30000'),
+    },
+    logging: {
+      level: process.env.LOG_LEVEL || 'info',
+      fileMaxSize: process.env.LOG_FILE_MAX_SIZE || '10m',
+      fileMaxFiles: parseInt(process.env.LOG_FILE_MAX_FILES || '7'),
+    },
+  };
+  console.log('Minimal configuration loaded successfully');
+}
+
+export { env };

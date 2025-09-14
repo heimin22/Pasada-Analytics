@@ -8,6 +8,19 @@ primary_region = "sin"
   source = "questdb_data"
   destination = "/var/lib/questdb"
 
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"
+
+[http_service]
+  internal_port = 9000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
 [[services]]
   internal_port = 9000
   protocol = "tcp"
