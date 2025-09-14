@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import { env } from '../config/environment';
@@ -43,7 +44,7 @@ const logger = winston.createLogger({
   level: env.logging?.level || 'info',
   format: logFormat,
   defaultMeta: { 
-    service: 'pasada-analytics',
+    service: 'pasada-analytics-v2',
     version: process.env.npm_package_version || '1.0.0'
   },
   transports: [

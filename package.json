@@ -1,5 +1,5 @@
 {
-  "name": "pasada-analytics",
+  "name": "pasada-analytics-v2",
   "version": "1.0.0",
   "description": "QuestDB Analytics Service for Pasada Backend",
   "main": "dist/server.js",
