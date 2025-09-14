@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Client as GoogleMapsClient } from '@googlemaps/google-maps-services-js';
+import { Client as GoogleMapsClient, TrafficModel } from '@googlemaps/google-maps-services-js';
 import { QuestDBService } from './questdbServices';
 import fetch from 'node-fetch';
 import { 
@@ -10,8 +10,38 @@ import {
 } from '../types/traffic';
 import logger from '../utils/logger';
 
+interface GoogleMapsDirectionParams {
+  origin: {
+    lat: number;
+    lng: number;
+  };
+  destination: {
+    lat: number;
+    lng: number;
+  };
+  waypoints?: {
+    lat: number;
+    lng: number;
+  }[];
+  departure_time: number | "now";
+  traffic_model: TrafficModel;
+  key: string;
+}
+
+interface TrafficSummary {
+  route_id: number;
+  route_name: string;
+  avg_traffic_density: number;
+  peak_traffic_density: number;
+  low_traffic_density: number;
+  avg_speed_kmh: number;
+  total_samples: number;
+}
+
+import { QuestDBConfig } from './questdbServices';
+
 interface TrafficAnalyticsConfig {
-  questdb: any;
+  questdb: QuestDBConfig;
   supabaseUrl: string;
   supabaseServiceKey: string;
   googleMapsApiKey: string;
@@ -225,7 +255,7 @@ export class TrafficAnalyticsService {
         }));
 
       // Call Google Maps Directions API with traffic data
-      const params: any = {
+      const params: GoogleMapsDirectionParams = {
         origin: {
           lat: parseFloat(route.origin_lat!),
           lng: parseFloat(route.origin_lng!)
@@ -235,7 +265,7 @@ export class TrafficAnalyticsService {
           lng: parseFloat(route.destination_lng!)
         },
         departure_time: 'now',
-        traffic_model: 'best_guess',
+        traffic_model: TrafficModel.best_guess,
         key: this.config.googleMapsApiKey
       };
 
@@ -508,6 +538,7 @@ export class TrafficAnalyticsService {
   /**
    * Generate weekly reports
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
   private async generateWeeklyReports(_routes: OfficialRoute[]): Promise<void> {
     // Implementation for weekly reports based on historical data
     logger.info('Generating weekly traffic reports...');
@@ -565,7 +596,7 @@ export class TrafficAnalyticsService {
   /**
    * Get traffic analytics summary for a specific route
    */
-  async getRouteTrafficSummary(routeId: number, days: number = 7): Promise<any> {
+  async getRouteTrafficSummary(routeId: number, days: number = 7): Promise<TrafficSummary | null> {
     await this.questdbService.connect();
     
     try {

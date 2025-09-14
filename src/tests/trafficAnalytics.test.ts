@@ -1,5 +1,6 @@
 import { TrafficAnalyticsService } from '../services/trafficAnalyticsService';
 import { AnalyticsService } from '../services/analyticsService';
+import { TestConfig, TrafficAnalyticsServiceTestAccess } from '../types/traffic';
 
 // Mock dependencies
 jest.mock('@supabase/supabase-js');
@@ -8,13 +9,14 @@ jest.mock('node-fetch');
 
 describe('TrafficAnalyticsService', () => {
   let service: TrafficAnalyticsService;
-  let mockConfig: any;
+  let mockConfig: TestConfig;
 
   beforeEach(() => {
     mockConfig = {
       questdb: {
         httpEndpoint: 'http://localhost:9000',
-        pgConnectionString: 'postgresql://localhost:5432/test'
+        pgConnectionString: 'postgresql://localhost:5432/test',
+        ilpEndpoint: 'http://localhost:9009'
       },
       supabaseUrl: 'https://test.supabase.co',
       supabaseServiceKey: 'test-key',
@@ -45,7 +47,7 @@ describe('TrafficAnalyticsService', () => {
   describe('Traffic Analysis Methods', () => {
     test('getDefaultTrafficDensity should return expected values for different hours', () => {
       // Access private method through type assertion
-      const getDefaultTrafficDensity = (service as any).getDefaultTrafficDensity;
+      const getDefaultTrafficDensity = (service as unknown as TrafficAnalyticsServiceTestAccess).getDefaultTrafficDensity;
       
       // Morning rush (7-9 AM)
       expect(getDefaultTrafficDensity(8)).toBe(0.6);
@@ -62,7 +64,7 @@ describe('TrafficAnalyticsService', () => {
     });
 
     test('sleep utility should work correctly', async () => {
-      const sleep = (service as any).sleep;
+      const sleep = (service as unknown as TrafficAnalyticsServiceTestAccess).sleep;
       const startTime = Date.now();
       await sleep(50);
       const endTime = Date.now();

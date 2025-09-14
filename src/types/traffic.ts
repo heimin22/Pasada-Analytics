@@ -42,7 +42,7 @@ export interface OfficialRoute {
   origin_lng?: string;
   destination_lat?: string;
   destination_lng?: string;
-  intermediate_coordinates?: any;
+  intermediate_coordinates?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -71,8 +71,8 @@ export interface GoogleMapsTrafficData {
     text: string;
     value: number; // in seconds
   };
-  traffic_speed_entry?: any[];
-  via_waypoint?: any[];
+  traffic_speed_entry?: Record<string, unknown>[];
+  via_waypoint?: Record<string, unknown>[];
 }
 
 export interface RouteTrafficAnalysis {
@@ -119,4 +119,49 @@ export interface TrafficForecast {
     confidence: number;
     expected_duration_seconds: number;
   }[];
+}
+
+// Weekly summary data structure for QuestDB
+export interface WeeklySummaryData {
+  week_start: string;
+  route_id: number;
+  sample_count: number;
+  avg_traffic_density: number;
+  min_traffic_density: number;
+  max_traffic_density: number;
+  avg_duration_seconds: number;
+  avg_duration_in_traffic_seconds: number;
+  avg_traffic_penalty_fraction: number;
+  total_distance_meters: number;
+  avg_speed_kmh: number;
+  peak_hour: number;
+}
+
+// QuestDB query response structure
+export interface QuestDBQueryResponse {
+  query: string;
+  columns: Array<{
+    name: string;
+    type: string;
+  }>;
+  dataset: string[][];
+  count: number;
+}
+
+// Test configuration interface
+export interface TestConfig {
+  questdb: {
+    httpEndpoint: string;
+    pgConnectionString: string;
+    ilpEndpoint: string;
+  };
+  supabaseUrl: string;
+  supabaseServiceKey: string;
+  googleMapsApiKey: string;
+}
+
+// Interface for accessing private methods in tests
+export interface TrafficAnalyticsServiceTestAccess {
+  getDefaultTrafficDensity: (hour: number) => number;
+  sleep: (ms: number) => Promise<void>;
 }
