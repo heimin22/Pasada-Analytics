@@ -11,7 +11,7 @@ primary_region = "sin"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory = "256mb"
+  memory = "1024mb"
 
 [http_service]
   internal_port = 9000

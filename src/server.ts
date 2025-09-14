@@ -171,7 +171,7 @@ class AnalyticsServer {
       res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        service: 'pasada-analytics',
+        service: 'pasada-analytics-v2',
         version: process.env.npm_package_version || '1.0.0'
       });
     });
