@@ -1,17 +1,21 @@
 import { QuestDBService } from './questdbServices';
 import { WeeklyAnalyticsService } from './weeklyAnalyticsService';
+import { TrafficAnalyticsService } from './trafficAnalyticsService';
 import { TrafficData, TrafficPrediction } from '../types/traffic';
 import { DatabaseService } from '../types/services';
+import { env } from '../config/environment';
 
 export class AnalyticsService {
   private questdbService?: QuestDBService;
   private weeklyAnalyticsService?: WeeklyAnalyticsService;
+  private trafficAnalyticsService?: TrafficAnalyticsService;
 
   constructor(
     private databaseService: DatabaseService | null
   ) {
     // Initialize QuestDB services if configured
     this.initializeQuestDB();
+    this.initializeTrafficAnalytics();
   }
 
   private initializeQuestDB(): void {
@@ -24,6 +28,23 @@ export class AnalyticsService {
       
       this.questdbService = new QuestDBService(config);
       this.weeklyAnalyticsService = new WeeklyAnalyticsService(config);
+    }
+  }
+
+  private initializeTrafficAnalytics(): void {
+    try {
+      if (env.supabaseUrl && env.supabaseServiceRoleKey && env.googleMapsApiKey && env.questdb) {
+        const trafficConfig = {
+          questdb: env.questdb,
+          supabaseUrl: env.supabaseUrl,
+          supabaseServiceKey: env.supabaseServiceRoleKey,
+          googleMapsApiKey: env.googleMapsApiKey
+        };
+        
+        this.trafficAnalyticsService = new TrafficAnalyticsService(trafficConfig);
+      }
+    } catch (error) {
+      console.warn('Traffic analytics service initialization failed:', error);
     }
   }
 
@@ -94,5 +115,38 @@ export class AnalyticsService {
     }
     
     return 0.3; // Default
+  }
+
+  /**
+   * Run comprehensive traffic analytics for all active routes
+   */
+  async runTrafficAnalytics(options: {
+    routeIds?: number[];
+    includeHistoricalAnalysis?: boolean;
+    generateForecasts?: boolean;
+  } = {}): Promise<any> {
+    if (!this.trafficAnalyticsService) {
+      throw new Error('Traffic analytics service not initialized');
+    }
+
+    return await this.trafficAnalyticsService.runTrafficAnalytics(options);
+  }
+
+  /**
+   * Get traffic summary for a specific route
+   */
+  async getRouteTrafficSummary(routeId: number, days: number = 7): Promise<any> {
+    if (!this.trafficAnalyticsService) {
+      throw new Error('Traffic analytics service not initialized');
+    }
+
+    return await this.trafficAnalyticsService.getRouteTrafficSummary(routeId, days);
+  }
+
+  /**
+   * Check if traffic analytics service is available
+   */
+  isTrafficAnalyticsAvailable(): boolean {
+    return !!this.trafficAnalyticsService;
   }
 }

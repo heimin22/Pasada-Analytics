@@ -16,6 +16,8 @@
     "analytics:migrate": "ts-node src/scripts/migrateToQuestDB.ts",
     "analytics:migrate-api": "ts-node src/scripts/migrateToQuestDB-api.ts",
     "analytics:test": "ts-node src/scripts/testQuestDBConnection.ts",
+    "analytics:traffic": "ts-node src/scripts/trafficAnalyticsPush.ts",
+    "analytics:traffic:validate": "ts-node src/scripts/validateTrafficAnalytics.ts",
     "cron:weekly": "node dist/scripts/weeklyAnalyticsPush.js",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
@@ -77,3 +79,6 @@
   "author": "Your Name",
   "license": "MIT"
 }
+
+
+

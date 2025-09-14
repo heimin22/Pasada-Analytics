@@ -258,6 +258,105 @@ class AnalyticsServer {
       }
     });
 
+    // Traffic Analytics endpoints
+    router.post('/traffic/run', async (req, res) => {
+      try {
+        const { routeIds, includeHistoricalAnalysis = false, generateForecasts = true } = req.body;
+
+        if (!this.analyticsService.isTrafficAnalyticsAvailable()) {
+          return res.status(503).json({ 
+            error: 'Traffic analytics service not available',
+            message: 'Service requires Supabase, Google Maps API, and QuestDB configuration'
+          });
+        }
+
+        const result = await this.analyticsService.runTrafficAnalytics({
+          routeIds,
+          includeHistoricalAnalysis,
+          generateForecasts
+        });
+
+        res.json({
+          success: result.success,
+          data: result,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      } catch (error) {
+        logger.error('Traffic analytics execution failed', error);
+        res.status(500).json({ error: 'Traffic analytics execution failed' });
+        return;
+      }
+    });
+
+    // Get traffic analytics summary for a route
+    router.get('/traffic/route/:routeId/summary', async (req, res) => {
+      try {
+        const routeId = parseInt(req.params.routeId);
+        const days = parseInt(req.query.days as string) || 7;
+
+        if (isNaN(routeId)) {
+          return res.status(400).json({ error: 'Invalid route ID' });
+        }
+
+        if (!this.analyticsService.isTrafficAnalyticsAvailable()) {
+          return res.status(503).json({ 
+            error: 'Traffic analytics service not available' 
+          });
+        }
+
+        const summary = await this.analyticsService.getRouteTrafficSummary(routeId, days);
+        
+        if (!summary) {
+          return res.status(404).json({ error: 'No traffic data found for this route' });
+        }
+
+        res.json({
+          success: true,
+          data: summary,
+          metadata: {
+            routeId,
+            days,
+            generatedAt: new Date().toISOString()
+          }
+        });
+        return;
+      } catch (error) {
+        logger.error('Traffic summary request failed', error, { routeId: req.params.routeId });
+        res.status(500).json({ error: 'Failed to fetch traffic summary' });
+        return;
+      }
+    });
+
+    // Get all routes traffic status
+    router.get('/traffic/status', async (_req, res) => {
+      try {
+        if (!this.analyticsService.isTrafficAnalyticsAvailable()) {
+          return res.json({
+            success: false,
+            available: false,
+            message: 'Traffic analytics service not configured'
+          });
+        }
+
+        res.json({
+          success: true,
+          available: true,
+          services: {
+            supabase: !!env.supabaseUrl,
+            googleMaps: !!env.googleMapsApiKey,
+            questdb: !!env.questdb.httpEndpoint
+          },
+          message: 'Traffic analytics service is ready'
+        });
+        return;
+      } catch (error) {
+        logger.error('Traffic status check failed', error);
+        res.status(500).json({ error: 'Failed to check traffic analytics status' });
+        return;
+      }
+    });
+
     this.app.use('/api/analytics', router);
   }
 
@@ -409,6 +508,46 @@ class AnalyticsServer {
           logger.info('Scheduled weekly analytics completed', { result });
         } catch (error) {
           logger.error('Scheduled weekly analytics failed', error);
+        }
+      }, {
+        timezone: 'Asia/Manila'
+      });
+
+      // Traffic Analytics - every 30 minutes during peak hours (6 AM - 10 PM)
+      cron.schedule('*/30 6-22 * * *', async () => {
+        logger.info('Starting scheduled traffic analytics');
+        try {
+          if (this.analyticsService.isTrafficAnalyticsAvailable()) {
+            const result = await this.analyticsService.runTrafficAnalytics({
+              includeHistoricalAnalysis: false,
+              generateForecasts: false
+            });
+            logger.info('Scheduled traffic analytics completed', { result });
+          } else {
+            logger.warn('Traffic analytics service not available - skipping scheduled run');
+          }
+        } catch (error) {
+          logger.error('Scheduled traffic analytics failed', error);
+        }
+      }, {
+        timezone: 'Asia/Manila'
+      });
+
+      // Traffic Analytics with forecasts - every 4 hours
+      cron.schedule('0 */4 * * *', async () => {
+        logger.info('Starting comprehensive traffic analytics with forecasts');
+        try {
+          if (this.analyticsService.isTrafficAnalyticsAvailable()) {
+            const result = await this.analyticsService.runTrafficAnalytics({
+              includeHistoricalAnalysis: true,
+              generateForecasts: true
+            });
+            logger.info('Comprehensive traffic analytics completed', { result });
+          } else {
+            logger.warn('Traffic analytics service not available - skipping comprehensive run');
+          }
+        } catch (error) {
+          logger.error('Comprehensive traffic analytics failed', error);
         }
       }, {
         timezone: 'Asia/Manila'
