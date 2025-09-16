@@ -48,6 +48,9 @@ console.log('WeeklyAnalyticsService imported successfully');
 console.log('Importing AnalyticsService...');
 import { AnalyticsService } from './services/analyticsService';
 console.log('AnalyticsService imported successfully');
+console.log('Importing BookingsAnalyticsService...');
+import { BookingsAnalyticsService } from './services/bookingsAnalyticsService';
+console.log('BookingsAnalyticsService imported successfully');
 
 console.log('Importing cron...');
 import cron from 'node-cron';
@@ -60,6 +63,7 @@ class AnalyticsServer {
   private questdbService: QuestDBService | null;
   private weeklyAnalyticsService: WeeklyAnalyticsService | null;
   private analyticsService: AnalyticsService;
+  private bookingsAnalyticsService: BookingsAnalyticsService | null;
   private server?: ReturnType<express.Application['listen']>;
 
   constructor() {
@@ -87,6 +91,12 @@ class AnalyticsServer {
       
       console.log('Initializing AnalyticsService...');
       this.analyticsService = new AnalyticsService(null); // No database service for now
+      try {
+        this.bookingsAnalyticsService = new BookingsAnalyticsService();
+      } catch (e) {
+        logger.warn('Bookings analytics not available - Supabase config missing');
+        this.bookingsAnalyticsService = null;
+      }
       logger.info('All services initialized successfully');
       console.log('All services initialized successfully');
     } catch (error) {
@@ -96,6 +106,7 @@ class AnalyticsServer {
       this.questdbService = null;
       this.weeklyAnalyticsService = null;
       this.analyticsService = new AnalyticsService(null);
+      this.bookingsAnalyticsService = null;
     }
     
     console.log('Setting up middleware...');
@@ -435,6 +446,93 @@ class AnalyticsServer {
     });
 
     this.app.use('/api/analytics', router);
+
+    // Bookings analytics endpoints
+    const bookingsRouter = express.Router();
+    bookingsRouter.get('/frequency', async (req, res) => {
+      try {
+        const daysHistory = parseInt((req.query.days as string) || '90') || 90;
+        if (!this.bookingsAnalyticsService) {
+          return res.status(503).json({ error: 'Bookings analytics service not available' });
+        }
+        const result = await this.bookingsAnalyticsService.getSevenDayForecast(daysHistory);
+        res.json({ success: true, data: result, generatedAt: new Date().toISOString() });
+        return;
+      } catch (error) {
+        logger.error('Bookings frequency forecast failed', error);
+        res.status(500).json({ error: 'Failed to generate bookings forecast' });
+        return;
+      }
+    });
+
+    // Persist daily counts into QuestDB
+    bookingsRouter.post('/frequency/persist/daily', async (req, res) => {
+      try {
+        const daysHistory = parseInt((req.query.days as string) || '90') || 90;
+        if (!this.bookingsAnalyticsService) {
+          return res.status(503).json({ error: 'Bookings analytics service not available' });
+        }
+        const result = await this.bookingsAnalyticsService.persistDailyCounts(daysHistory);
+        res.json({ success: true, data: result, generatedAt: new Date().toISOString() });
+        return;
+      } catch (error) {
+        logger.error('Persist daily counts failed', error);
+        res.status(500).json({ error: 'Failed to persist daily counts' });
+        return;
+      }
+    });
+
+    // Persist 7-day forecast into QuestDB
+    bookingsRouter.post('/frequency/persist/forecast', async (req, res) => {
+      try {
+        const daysHistory = parseInt((req.query.days as string) || '90') || 90;
+        if (!this.bookingsAnalyticsService) {
+          return res.status(503).json({ error: 'Bookings analytics service not available' });
+        }
+        const result = await this.bookingsAnalyticsService.persistForecast(daysHistory);
+        res.json({ success: true, data: result, generatedAt: new Date().toISOString() });
+        return;
+      } catch (error) {
+        logger.error('Persist forecast failed', error);
+        res.status(500).json({ error: 'Failed to persist forecast' });
+        return;
+      }
+    });
+
+    // Read from QuestDB: recent daily counts
+    bookingsRouter.get('/frequency/daily', async (req, res) => {
+      try {
+        const days = parseInt((req.query.days as string) || '90') || 90;
+        if (!this.bookingsAnalyticsService) {
+          return res.status(503).json({ error: 'Bookings analytics service not available' });
+        }
+        const data = await this.bookingsAnalyticsService.getDailyCountsFromQuestDB(days);
+        res.json({ success: true, data, generatedAt: new Date().toISOString() });
+        return;
+      } catch (error) {
+        logger.error('Fetch daily counts from QuestDB failed', error);
+        res.status(500).json({ error: 'Failed to fetch daily counts' });
+        return;
+      }
+    });
+
+    // Read from QuestDB: latest 7-day forecast set
+    bookingsRouter.get('/frequency/forecast/latest', async (_req, res) => {
+      try {
+        if (!this.bookingsAnalyticsService) {
+          return res.status(503).json({ error: 'Bookings analytics service not available' });
+        }
+        const data = await this.bookingsAnalyticsService.getLatestForecastFromQuestDB();
+        res.json({ success: true, data, generatedAt: new Date().toISOString() });
+        return;
+      } catch (error) {
+        logger.error('Fetch latest forecast from QuestDB failed', error);
+        res.status(500).json({ error: 'Failed to fetch latest forecast' });
+        return;
+      }
+    });
+
+    this.app.use('/api/analytics/bookings', bookingsRouter);
   }
 
   private setupDataRoutes(): void {
